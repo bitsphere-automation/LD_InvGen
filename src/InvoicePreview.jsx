@@ -10,50 +10,17 @@ const styles = {
     padding: 20,
     borderRadius: 8,
     backgroundColor: "#fff",
+    position: "relative"
   },
-  header: {
-    borderBottom: "2px solid #000",
-    marginBottom: 20,
-    paddingBottom: 10,
-  },
-  companyName: {
-    fontSize: 28,
-    fontWeight: "bold",
-  },
-  companyDetails: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  label: {
-    fontWeight: "bold",
-  },
-  itemTable: {
-    width: "100%",
-    borderCollapse: "collapse",
-    marginBottom: 20,
-  },
-  th: {
-    borderBottom: "1px solid #aaa",
-    textAlign: "left",
-    padding: "8px 6px",
-    fontWeight: "bold",
-  },
-  td: {
-    borderBottom: "1px solid #eee",
-    padding: "8px 6px",
-  },
-  totalsRow: {
-    fontWeight: "bold",
-  },
-  notes: {
-    fontSize: 12,
-    marginTop: 15,
-    borderTop: "1px dashed #ccc",
-    paddingTop: 10,
-  },
+  header: { borderBottom: "2px solid #000", marginBottom: 20, paddingBottom: 10 },
+  companyName: { fontSize: 28, fontWeight: "bold" },
+  companyDetails: { fontSize: 12, marginTop: 4 },
+  section: { marginBottom: 20 },
+  itemTable: { width: "100%", borderCollapse: "collapse", marginBottom: 20 },
+  th: { borderBottom: "1px solid #aaa", textAlign: "left", padding: "8px 6px", fontWeight: "bold" },
+  td: { borderBottom: "1px solid #eee", padding: "8px 6px" },
+  totalsRow: { fontWeight: "bold" },
+  notes: { fontSize: 12, marginTop: 15, borderTop: "1px dashed #ccc", paddingTop: 10 },
 };
 
 export default function InvoicePreview({ data }) {
@@ -64,12 +31,18 @@ export default function InvoicePreview({ data }) {
     project,
     items,
     subtotal,
+    gstPercent,
+    gstAmount,
+    totalAfterGST,
     paymentMade = 0,
     balanceDue,
     currencySymbol = "₹",
+    logo,
+    preparedBy,
+    verifiedBy,
+    // selectedStamp,
   } = data;
 
-  // Format invoice number for display as # LD/OvP/2024-25
   let invoiceNumberFormatted = invoiceNumber;
   if (invoiceNumber) {
     const parts = invoiceNumber.split("-");
@@ -80,7 +53,9 @@ export default function InvoicePreview({ data }) {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
+      {logo && (
+        <img src={logo} alt="Logo" style={{ width: 120, marginBottom: 16 }} />
+      )}
       <div style={styles.header}>
         <div style={styles.companyName}>Leads To Company</div>
         <div style={styles.companyDetails}>
@@ -90,8 +65,6 @@ export default function InvoicePreview({ data }) {
           support@leadstocompany.com
         </div>
       </div>
-
-      {/* Invoice client & project */}
       <div style={{ display: "flex", justifyContent: "space-between", ...styles.section }}>
         <div>
           <div><strong>Invoice Number:</strong> {invoiceNumberFormatted}</div>
@@ -107,8 +80,6 @@ export default function InvoicePreview({ data }) {
           <div>{client.country} {client.zip}</div>
         </div>
       </div>
-
-      {/* Items Table */}
       <table style={styles.itemTable}>
         <thead>
           <tr>
@@ -119,7 +90,7 @@ export default function InvoicePreview({ data }) {
           </tr>
         </thead>
         <tbody>
-          {(items.length === 0) && (
+          {items.length === 0 && (
             <tr>
               <td colSpan="4" style={{ textAlign: "center", padding: 15 }}>
                 No items added
@@ -137,13 +108,21 @@ export default function InvoicePreview({ data }) {
               </tr>
             );
           })}
-          <tr style={styles.totalsRow}>
-            <td colSpan="3" style={{ ...styles.td, textAlign: "right" }}>Subtotal:</td>
+          <tr>
+            <td colSpan="3" style={styles.td}>Subtotal:</td>
             <td style={styles.td}>{currencySymbol}{subtotal.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td colSpan="3" style={styles.td}>GST ({gstPercent}%):</td>
+            <td style={styles.td}>{currencySymbol}{gstAmount.toFixed(2)}</td>
+          </tr>
+          <tr style={styles.totalsRow}>
+            <td colSpan="3" style={{ ...styles.td, textAlign: "right" }}>Total:</td>
+            <td style={styles.td}>{currencySymbol}{totalAfterGST.toFixed(2)}</td>
           </tr>
           <tr style={styles.totalsRow}>
             <td colSpan="3" style={{ ...styles.td, textAlign: "right" }}>Payments Made:</td>
-            <td style={styles.td}>{currencySymbol}{paymentMade.toFixed(2)}</td>
+            <td style={styles.td}>{currencySymbol}{Number(paymentMade).toFixed(2)}</td>
           </tr>
           <tr style={styles.totalsRow}>
             <td colSpan="3" style={{ ...styles.td, textAlign: "right" }}>Balance Due:</td>
@@ -151,8 +130,6 @@ export default function InvoicePreview({ data }) {
           </tr>
         </tbody>
       </table>
-
-      {/* Payment terms & notes */}
       <div style={styles.notes}>
         <h4>Terms</h4>
         <p>Payments will be made to the following account through NEFT:</p>
@@ -164,14 +141,15 @@ export default function InvoicePreview({ data }) {
           OR<br />
           UPI: mansumseo-2@oksbi
         </p>
-   
-{/* 
-<p><strong>Payments Made so far:</strong></p>
-<ul>
-  <li>09.09.2024 -- Rs. 21000</li>
-  <li>19.12.2024 -- Rs. 20000</li>
-</ul>
-*/}
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "flex-end" }}>
+        <div style={{ textAlign: "right", marginTop: 28 }}>
+          <div>Prepared by: {preparedBy}</div>
+          <div>Verified by: {verifiedBy}</div>
+          {/* {selectedStamp && (
+            <img src={selectedStamp} style={{ width: 80, marginTop: 8 }} alt="Stamp" />
+          )} */}
+        </div>
       </div>
     </div>
   );
