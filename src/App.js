@@ -2,12 +2,9 @@ import React, { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import InvoiceForm from "./InvoiceForm";
 import InvoicePreview from "./InvoicePreview";
-// Logo imports — update the paths as appropriate for your project!
+// Update paths to your actual logos in src/assets
 import logoLeadsToCompany from "./assets/logo_leads_to_company.png";
 import logoLeadsDigital from "./assets/logo_leads_digital.png";
-// (Optional) For stamp images:
-// import stamp1 from "./assets/stamp1.png";
-// import stamp2 from "./assets/stamp2.png";
 
 const currencySymbols = { INR: "₹", USD: "$" };
 
@@ -18,7 +15,13 @@ const generateInvoiceNumber = ({ projectCode, projectType, year, serialNumber })
 const getLogoByProjectCode = (projectCode) => {
   if (projectCode === "LD") return logoLeadsDigital;
   if (projectCode === "LTC") return logoLeadsToCompany;
-  return logoLeadsToCompany; // fallback
+  return logoLeadsToCompany;
+};
+
+const getCompanyNameByProjectCode = (projectCode) => {
+  if (projectCode === "LD") return "Leads Digital";
+  if (projectCode === "LTC") return "Leads To Company";
+  return "Leads To Company";
 };
 
 export default function App() {
@@ -45,8 +48,6 @@ export default function App() {
     gstPercent: 18,
     preparedBy: "",
     verifiedBy: "",
-    // Optionally, selectedStamp: stamp1,
-    // Optionally, use for digital stamp selection
   });
 
   useEffect(() => {
@@ -75,8 +76,9 @@ export default function App() {
   const gstAmount = subtotal * (Number(invoiceData.gstPercent) || 0) / 100;
   const totalAfterGST = subtotal + gstAmount;
   const balanceDue = totalAfterGST - Number(invoiceData.paymentMade);
+//const currencySymbols = { INR: "\u20B9", USD: "$" };
+const currencySymbols = { INR: "Rs.", USD: "$" };
   const currencySymbol = currencySymbols[invoiceData.currency] || "";
-
   const handleChange = (data) => setInvoiceData((prev) => ({ ...prev, ...data }));
   const incrementSerial = () =>
     setInvoiceData((prev) => ({ ...prev, serialNumber: prev.serialNumber + 1 }));
@@ -84,20 +86,45 @@ export default function App() {
   const handleDownload = () => {
     const doc = new jsPDF();
 
+    // Initialize page dimensions immediately after doc creation
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
     const leftMargin = 10;
     let vertical = 10;
     const lineHeight = 8;
 
-    // Logo display at the top
     const logoImage = getLogoByProjectCode(invoiceData.project.projectCode);
-    if (logoImage) {
-      doc.addImage(logoImage, "PNG", leftMargin, vertical, 40, 18);
-    }
-    vertical += 22; // space under logo
+    const companyHeader = getCompanyNameByProjectCode(invoiceData.project.projectCode);
 
-    // Company info
+    // Logo natural dimensions & sizing
+    const desiredLogoHeight = 25;
+    let logoOriginalWidth = 500;
+    let logoOriginalHeight = 500;
+
+    if (invoiceData.project.projectCode === "LD") {
+      logoOriginalWidth = 2560;
+      logoOriginalHeight = 2560;
+    }
+
+    const aspectRatio = logoOriginalWidth / logoOriginalHeight;
+    const desiredLogoWidth = desiredLogoHeight * aspectRatio;
+
+    // Draw logo preserving aspect ratio
+    if (logoImage) {
+      doc.addImage(logoImage, "PNG", leftMargin, vertical, desiredLogoWidth, desiredLogoHeight);
+    }
+    vertical += desiredLogoHeight + 4; // spacing after logo
+
+    // Centered bold header
     doc.setFontSize(20);
-    doc.text("Leads To Company", leftMargin + 50, vertical - 8);
+    doc.setFont("helvetica", "bold");
+    const textWidth = doc.getTextWidth(companyHeader);
+    const xCenter = (pageWidth - textWidth) / 2;
+    doc.text(companyHeader, xCenter, vertical - 8);
+    doc.setFont("helvetica", "normal");
+
+    // Company address and contact info
     doc.setFontSize(10);
     doc.text("S.M. Sarani, Kolkata", leftMargin, vertical);
     vertical += lineHeight;
@@ -108,21 +135,19 @@ export default function App() {
     doc.text("support@leadstocompany.com", leftMargin, vertical);
     vertical += lineHeight * 2;
 
-    // Invoice info right aligned
-    const pageWidth = doc.internal.pageSize.getWidth();
+    // Right side Invoice info
     const rightStart = pageWidth / 2 + 20;
-    vertical = 10 + 22; // adjust for logo
+    vertical = 10 + desiredLogoHeight + 4; // align with logo bottom space
 
     doc.setFontSize(16);
     doc.text("Invoice", rightStart, vertical);
     vertical += lineHeight + 2;
 
-    // Format invoice number as per template
     let invoiceNumberFormatted = invoiceData.invoiceNumber;
     if (invoiceData.invoiceNumber) {
       const parts = invoiceData.invoiceNumber.split("-");
       if (parts.length === 5) {
-        invoiceNumberFormatted = `${parts[1]}/${parts[2]}/${parts[3]}-${parts[4]}`;
+        invoiceNumberFormatted = `${parts}/${parts}/${parts}-${parts}`;
       }
     }
     doc.setFontSize(12);
@@ -135,7 +160,7 @@ export default function App() {
     doc.text(`Currency: ${currencySymbol}`, rightStart, vertical);
     vertical += lineHeight * 2;
 
-    // Client info left
+    // Client info left side
     doc.setFontSize(12);
     doc.text("Bill To:", leftMargin, vertical);
     vertical += lineHeight;
@@ -161,7 +186,7 @@ export default function App() {
     }
     vertical += lineHeight;
 
-    // Table Header
+    // Table headers
     doc.setFontSize(12);
     doc.text("Item", leftMargin, vertical);
     doc.text("Quantity", leftMargin + 80, vertical);
@@ -171,7 +196,7 @@ export default function App() {
     doc.setLineWidth(0.5);
     doc.line(leftMargin, vertical - 4, leftMargin + 180, vertical - 4);
 
-    // Item rows
+    // Items rows
     invoiceData.items.forEach((item) => {
       const amount = Number(item.quantity) * Number(item.unitPrice);
       doc.text(item.description, leftMargin, vertical);
@@ -203,7 +228,7 @@ export default function App() {
     doc.setTextColor(0, 0, 0);
     vertical += lineHeight * 2;
 
-    // Terms
+    // Terms section
     doc.setFontSize(14);
     doc.text("Terms", leftMargin, vertical);
     vertical += lineHeight;
@@ -222,15 +247,11 @@ export default function App() {
     vertical += lineHeight;
     doc.text("UPI: mansumseo-2@oksbi", leftMargin, vertical);
 
-    // Prepared By / Verified By section (bottom/right)
-    const yBottom = doc.internal.pageSize.getHeight() - 40;
+    // Prepared By / Verified By at bottom-right
+    const yBottom = pageHeight - 40;
     doc.setFontSize(12);
     doc.text(`Prepared by: ${invoiceData.preparedBy || ""}`, pageWidth - 80, yBottom);
     doc.text(`Verified by: ${invoiceData.verifiedBy || ""}`, pageWidth - 80, yBottom + 8);
-    // For stamp image, if desired:
-    // if (invoiceData.selectedStamp) {
-    //   doc.addImage(invoiceData.selectedStamp, "PNG", pageWidth - 60, yBottom + 16, 40, 40);
-    // }
 
     doc.save(`${invoiceData.invoiceNumber}.pdf`);
   };
@@ -252,6 +273,7 @@ export default function App() {
           balanceDue,
           currencySymbol,
           logo: getLogoByProjectCode(invoiceData.project.projectCode),
+          companyHeader: getCompanyNameByProjectCode(invoiceData.project.projectCode),
         }}
       />
     </div>
