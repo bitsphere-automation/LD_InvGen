@@ -13,6 +13,7 @@ const styles = {
     position: "relative"
   },
   header: { borderBottom: "2px solid #000", marginBottom: 20, paddingBottom: 10 },
+  invoiceType: { textAlign: "center", fontSize: 24, fontWeight: "bold", marginBottom: 10 },
   companyName: { fontSize: 28, fontWeight: "bold" },
   companyDetails: { fontSize: 12, marginTop: 4 },
   section: { marginBottom: 20 },
@@ -40,7 +41,7 @@ export default function InvoicePreview({ data }) {
     logo,
     preparedBy,
     verifiedBy,
-    // selectedStamp,
+    invoiceType = "Tax Invoice",
   } = data;
 
   let invoiceNumberFormatted = invoiceNumber;
@@ -53,6 +54,9 @@ export default function InvoicePreview({ data }) {
 
   return (
     <div style={styles.container}>
+      <div style={styles.invoiceType}>
+        {invoiceType}
+      </div>
       {logo && (
         <img src={logo} alt="Logo" style={{ width: 120, marginBottom: 16 }} />
       )}
@@ -112,10 +116,12 @@ export default function InvoicePreview({ data }) {
             <td colSpan="3" style={styles.td}>Subtotal:</td>
             <td style={styles.td}>{currencySymbol}{subtotal.toFixed(2)}</td>
           </tr>
-          <tr>
-            <td colSpan="3" style={styles.td}>GST ({gstPercent}%):</td>
-            <td style={styles.td}>{currencySymbol}{gstAmount.toFixed(2)}</td>
-          </tr>
+          {invoiceType === "Tax Invoice" && (
+            <tr>
+              <td colSpan="3" style={styles.td}>GST ({gstPercent}%):</td>
+              <td style={styles.td}>{currencySymbol}{gstAmount.toFixed(2)}</td>
+            </tr>
+          )}
           <tr style={styles.totalsRow}>
             <td colSpan="3" style={{ ...styles.td, textAlign: "right" }}>Total:</td>
             <td style={styles.td}>{currencySymbol}{totalAfterGST.toFixed(2)}</td>
@@ -146,9 +152,6 @@ export default function InvoicePreview({ data }) {
         <div style={{ textAlign: "right", marginTop: 28 }}>
           <div>Prepared by: {preparedBy}</div>
           <div>Verified by: {verifiedBy}</div>
-          {/* {selectedStamp && (
-            <img src={selectedStamp} style={{ width: 80, marginTop: 8 }} alt="Stamp" />
-          )} */}
         </div>
       </div>
     </div>
