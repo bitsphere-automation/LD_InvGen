@@ -2,27 +2,19 @@ import React, { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import InvoiceForm from "./InvoiceForm";
 import InvoicePreview from "./InvoicePreview";
-// Update paths to your actual logos in src/assets
 import logoLeadsToCompany from "./assets/logo_leads_to_company.png";
 import logoLeadsDigital from "./assets/logo_leads_digital.png";
 
-const currencySymbols = { INR: "₹", USD: "$" };
+const currencySymbols = { INR: "Rs.", USD: "$" };
 
-const generateInvoiceNumber = ({ projectCode, projectType, year, serialNumber }) => {
-  return `Invoice-${projectCode}-${projectType}-${year}-${serialNumber}`;
-};
+const generateInvoiceNumber = ({ projectCode, projectType, year, serialNumber }) =>
+  `Invoice-${projectCode}-${projectType}-${year}-${serialNumber}`;
 
-const getLogoByProjectCode = (projectCode) => {
-  if (projectCode === "LD") return logoLeadsDigital;
-  if (projectCode === "LTC") return logoLeadsToCompany;
-  return logoLeadsToCompany;
-};
+const getLogoByProjectCode = (projectCode) =>
+  projectCode === "LD" ? logoLeadsDigital : logoLeadsToCompany;
 
-const getCompanyNameByProjectCode = (projectCode) => {
-  if (projectCode === "LD") return "Leads Digital";
-  if (projectCode === "LTC") return "Leads To Company";
-  return "Leads To Company";
-};
+const getCompanyNameByProjectCode = (projectCode) =>
+  projectCode === "LD" ? "Leads Digital" : "Leads To Company";
 
 export default function App() {
   const [invoiceData, setInvoiceData] = useState({
@@ -48,13 +40,14 @@ export default function App() {
     gstPercent: 18,
     preparedBy: "",
     verifiedBy: "",
+    invoiceType: "Tax Invoice", // NEW: Controls Tax Invoice / Bill of Supply
   });
 
   useEffect(() => {
     const year = new Date(invoiceData.date).getFullYear();
     const invoiceNumber = generateInvoiceNumber({
-      projectCode: invoiceData.project.projectCode || "LD",
-      projectType: invoiceData.project.projectType || "OvP",
+      projectCode: invoiceData.project.projectCode,
+      projectType: invoiceData.project.projectType,
       year,
       serialNumber: invoiceData.serialNumber,
     });
@@ -73,95 +66,70 @@ export default function App() {
     (acc, item) => acc + Number(item.quantity) * Number(item.unitPrice),
     0
   );
-  const gstAmount = subtotal * (Number(invoiceData.gstPercent) || 0) / 100;
+  // GST only for Tax Invoice
+  const gstAmount = invoiceData.invoiceType === "Tax Invoice"
+    ? subtotal * (Number(invoiceData.gstPercent) || 0) / 100
+    : 0;
   const totalAfterGST = subtotal + gstAmount;
   const balanceDue = totalAfterGST - Number(invoiceData.paymentMade);
-//const currencySymbols = { INR: "\u20B9", USD: "$" };
-const currencySymbols = { INR: "Rs.", USD: "$" };
   const currencySymbol = currencySymbols[invoiceData.currency] || "";
+
   const handleChange = (data) => setInvoiceData((prev) => ({ ...prev, ...data }));
+  const handleTypeChange = (type) => setInvoiceData((prev) => ({ ...prev, invoiceType: type }));
   const incrementSerial = () =>
     setInvoiceData((prev) => ({ ...prev, serialNumber: prev.serialNumber + 1 }));
 
   const handleDownload = () => {
     const doc = new jsPDF();
-
-    // Initialize page dimensions immediately after doc creation
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
 
-    const leftMargin = 10;
-    let vertical = 10;
+    // Margins and vertical spacing
+    const leftMargin = 16;
+    const rightMargin = pageWidth - 16;
+    let vertical = 18;
     const lineHeight = 8;
 
+    // Company logo and header
     const logoImage = getLogoByProjectCode(invoiceData.project.projectCode);
     const companyHeader = getCompanyNameByProjectCode(invoiceData.project.projectCode);
-
-    // Logo natural dimensions & sizing
-    const desiredLogoHeight = 25;
-    let logoOriginalWidth = 500;
-    let logoOriginalHeight = 500;
-
-    if (invoiceData.project.projectCode === "LD") {
-      logoOriginalWidth = 2560;
-      logoOriginalHeight = 2560;
-    }
-
+    const desiredLogoHeight = 22;
+    const logoOriginalWidth = invoiceData.project.projectCode === "LD" ? 2560 : 500;
+    const logoOriginalHeight = invoiceData.project.projectCode === "LD" ? 2560 : 500;
     const aspectRatio = logoOriginalWidth / logoOriginalHeight;
     const desiredLogoWidth = desiredLogoHeight * aspectRatio;
 
-    // Draw logo preserving aspect ratio
+    // Draw logo and header side by side
     if (logoImage) {
       doc.addImage(logoImage, "PNG", leftMargin, vertical, desiredLogoWidth, desiredLogoHeight);
     }
-    vertical += desiredLogoHeight + 4; // spacing after logo
 
-    // Centered bold header
-    doc.setFontSize(20);
+    // Center the Invoice Type at top
+    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    const textWidth = doc.getTextWidth(companyHeader);
-    const xCenter = (pageWidth - textWidth) / 2;
-    doc.text(companyHeader, xCenter, vertical - 8);
-    doc.setFont("helvetica", "normal");
+    doc.text(invoiceData.invoiceType, pageWidth / 2, vertical + 6, { align: "center" });
+    doc.setFontSize(20);
+    doc.text(companyHeader, leftMargin + desiredLogoWidth + 10, vertical + 14);
+
+    vertical += desiredLogoHeight + 7;
 
     // Company address and contact info
     doc.setFontSize(10);
-    doc.text("S.M. Sarani, Kolkata", leftMargin, vertical);
-    vertical += lineHeight;
-    doc.text("PIN-700127", leftMargin, vertical);
-    vertical += lineHeight;
-    doc.text("8296343757 / 8240245144", leftMargin, vertical);
-    vertical += lineHeight;
-    doc.text("support@leadstocompany.com", leftMargin, vertical);
+    doc.setFont("helvetica", "normal");
+    doc.text("S.M. Sarani, Kolkata | PIN-700127 | 8296343757 / 8240245144 | support@leadstocompany.com", leftMargin, vertical);
     vertical += lineHeight * 2;
 
-    // Right side Invoice info
-    const rightStart = pageWidth / 2 + 20;
-    vertical = 10 + desiredLogoHeight + 4; // align with logo bottom space
-
-    doc.setFontSize(16);
-    doc.text("Invoice", rightStart, vertical);
-    vertical += lineHeight + 2;
-
-    let invoiceNumberFormatted = invoiceData.invoiceNumber;
-    if (invoiceData.invoiceNumber) {
-      const parts = invoiceData.invoiceNumber.split("-");
-      if (parts.length === 5) {
-        invoiceNumberFormatted = `${parts}/${parts}/${parts}-${parts}`;
-      }
-    }
+    // Invoice meta (right-aligned)
     doc.setFontSize(12);
-    doc.text(`# ${invoiceNumberFormatted}`, rightStart, vertical);
+    doc.text(`# ${invoiceData.invoiceNumber}`, rightMargin - doc.getTextWidth(`# ${invoiceData.invoiceNumber}`), vertical);
     vertical += lineHeight;
-    doc.text(`Date: ${new Date(invoiceData.date).toLocaleDateString()}`, rightStart, vertical);
+    doc.text(`Date: ${new Date(invoiceData.date).toLocaleDateString()}`, rightMargin - doc.getTextWidth(`Date: ${new Date(invoiceData.date).toLocaleDateString()}`), vertical);
     vertical += lineHeight;
-    doc.text(`Project: ${invoiceData.project.name || "Ongoing Work"}`, rightStart, vertical);
+    doc.text(`Project: ${invoiceData.project.name || "Ongoing Work"}`, rightMargin - doc.getTextWidth(`Project: ${invoiceData.project.name || "Ongoing Work"}`), vertical);
     vertical += lineHeight;
-    doc.text(`Currency: ${currencySymbol}`, rightStart, vertical);
+    doc.text(`Currency: ${currencySymbol}`, rightMargin - doc.getTextWidth(`Currency: ${currencySymbol}`), vertical);
     vertical += lineHeight * 2;
 
-    // Client info left side
-    doc.setFontSize(12);
+    // Client Info (left block)
     doc.text("Bill To:", leftMargin, vertical);
     vertical += lineHeight;
     if (invoiceData.client.name) {
@@ -186,54 +154,64 @@ const currencySymbols = { INR: "Rs.", USD: "$" };
     }
     vertical += lineHeight;
 
-    // Table headers
+    // Table layout: columns
+    const colItem = leftMargin;
+    const colQty = colItem + 72;
+    const colRate = colQty + 30;
+    const colAmt = colRate + 38;
+
     doc.setFontSize(12);
-    doc.text("Item", leftMargin, vertical);
-    doc.text("Quantity", leftMargin + 80, vertical);
-    doc.text("Rate", leftMargin + 110, vertical);
-    doc.text("Amount", leftMargin + 150, vertical);
+    doc.text("Item", colItem, vertical);
+    doc.text("Quantity", colQty, vertical);
+    doc.text("Rate", colRate, vertical);
+    doc.text("Amount", colAmt, vertical);
+
     vertical += lineHeight;
     doc.setLineWidth(0.5);
-    doc.line(leftMargin, vertical - 4, leftMargin + 180, vertical - 4);
+    doc.line(leftMargin, vertical - 4, colAmt + 38, vertical - 4);
 
-    // Items rows
+    // Items
     invoiceData.items.forEach((item) => {
       const amount = Number(item.quantity) * Number(item.unitPrice);
-      doc.text(item.description, leftMargin, vertical);
-      doc.text(String(item.quantity), leftMargin + 80, vertical);
-      doc.text(`${currencySymbol}${Number(item.unitPrice).toFixed(2)}`, leftMargin + 110, vertical);
-      doc.text(`${currencySymbol}${amount.toFixed(2)}`, leftMargin + 150, vertical);
+      doc.text(item.description, colItem, vertical);
+      doc.text(String(item.quantity), colQty, vertical);
+      doc.text(`${currencySymbol}${Number(item.unitPrice).toFixed(2)}`, colRate, vertical);
+      doc.text(`${currencySymbol}${amount.toFixed(2)}`, colAmt, vertical);
       vertical += lineHeight;
     });
 
-    // Calculation rows
-    vertical += 5;
-    doc.text("Subtotal:", leftMargin + 110, vertical);
-    doc.text(`${currencySymbol}${subtotal.toFixed(2)}`, leftMargin + 150, vertical);
+    // Calculation rows (handle GST conditional)
+    vertical += 4;
+    doc.text("Subtotal:", colRate, vertical);
+    doc.text(`${currencySymbol}${subtotal.toFixed(2)}`, colAmt, vertical);
     vertical += lineHeight;
-    doc.text(`GST (${invoiceData.gstPercent}%):`, leftMargin + 110, vertical);
-    doc.text(`${currencySymbol}${gstAmount.toFixed(2)}`, leftMargin + 150, vertical);
-    vertical += lineHeight;
+
+    if (invoiceData.invoiceType === "Tax Invoice") {
+      doc.text(`GST (${invoiceData.gstPercent}%):`, colRate, vertical);
+      doc.text(`${currencySymbol}${gstAmount.toFixed(2)}`, colAmt, vertical);
+      vertical += lineHeight;
+    }
+
     doc.setFont("bold");
-    doc.text("Total:", leftMargin + 110, vertical);
-    doc.text(`${currencySymbol}${totalAfterGST.toFixed(2)}`, leftMargin + 150, vertical);
+    doc.text("Total:", colRate, vertical);
+    doc.text(`${currencySymbol}${totalAfterGST.toFixed(2)}`, colAmt, vertical);
     doc.setFont("normal");
     vertical += lineHeight;
-    doc.text("Payment Made:", leftMargin + 110, vertical);
-    doc.text(`${currencySymbol}${Number(invoiceData.paymentMade).toFixed(2)}`, leftMargin + 150, vertical);
+    doc.text("Payment Made:", colRate, vertical);
+    doc.text(`${currencySymbol}${Number(invoiceData.paymentMade).toFixed(2)}`, colAmt, vertical);
     vertical += lineHeight;
     doc.setTextColor(255, 0, 0);
-    doc.text("Balance Due:", leftMargin + 110, vertical);
-    doc.text(`${currencySymbol}${balanceDue.toFixed(2)}`, leftMargin + 150, vertical);
+    doc.text("Balance Due:", colRate, vertical);
+    doc.text(`${currencySymbol}${balanceDue.toFixed(2)}`, colAmt, vertical);
     doc.setTextColor(0, 0, 0);
     vertical += lineHeight * 2;
 
-    // Terms section
+    // Terms
     doc.setFontSize(14);
     doc.text("Terms", leftMargin, vertical);
     vertical += lineHeight;
     doc.setFontSize(11);
-    doc.text("Payments will be made to the following account through NEFT:", leftMargin, vertical, { maxWidth: 190 });
+    doc.text("Payments will be made to the following account through NEFT:", leftMargin, vertical, { maxWidth: pageWidth - 2 * leftMargin });
     vertical += lineHeight * 2;
     doc.text("MANAS DATTA", leftMargin, vertical);
     vertical += lineHeight;
@@ -248,10 +226,10 @@ const currencySymbols = { INR: "Rs.", USD: "$" };
     doc.text("UPI: mansumseo-2@oksbi", leftMargin, vertical);
 
     // Prepared By / Verified By at bottom-right
-    const yBottom = pageHeight - 40;
+    const yBottom = doc.internal.pageSize.getHeight() - 28;
     doc.setFontSize(12);
-    doc.text(`Prepared by: ${invoiceData.preparedBy || ""}`, pageWidth - 80, yBottom);
-    doc.text(`Verified by: ${invoiceData.verifiedBy || ""}`, pageWidth - 80, yBottom + 8);
+    doc.text(`Prepared by: ${invoiceData.preparedBy || ""}`, rightMargin - doc.getTextWidth(`Prepared by: ${invoiceData.preparedBy || ""}`), yBottom);
+    doc.text(`Verified by: ${invoiceData.verifiedBy || ""}`, rightMargin - doc.getTextWidth(`Verified by: ${invoiceData.verifiedBy || ""}`), yBottom + 8);
 
     doc.save(`${invoiceData.invoiceNumber}.pdf`);
   };
@@ -259,7 +237,11 @@ const currencySymbols = { INR: "Rs.", USD: "$" };
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", fontFamily: "sans-serif" }}>
       <h2>Dynamic React Invoice Generator</h2>
-      <InvoiceForm data={invoiceData} onChange={handleChange} />
+      <InvoiceForm
+        data={invoiceData}
+        onChange={handleChange}
+        onTypeChange={handleTypeChange}
+      />
       <button onClick={handleDownload} style={{ marginRight: 10 }}>
         Download PDF
       </button>
