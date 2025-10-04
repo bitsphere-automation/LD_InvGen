@@ -5,7 +5,7 @@ const currencyOptions = [
   { value: "USD", label: "USD ($)" },
 ];
 
-export default function InvoiceForm({ data, onChange }) {
+export default function InvoiceForm({ data, onChange, onTypeChange }) {
   const handleClientChange = (e) => {
     const { name, value } = e.target;
     onChange({ client: { ...data.client, [name]: value } });
@@ -49,6 +49,16 @@ export default function InvoiceForm({ data, onChange }) {
 
   return (
     <form style={{ marginBottom: 20 }}>
+      <h3>Invoice Type</h3>
+      <select
+        value={data.invoiceType}
+        onChange={(e) => onTypeChange(e.target.value)}
+        style={{ marginBottom: 10, width: 200 }}
+      >
+        <option value="Tax Invoice">Tax Invoice</option>
+        <option value="Bill of Supply">Bill of Supply</option>
+      </select>
+
       <h3>Client Information</h3>
       <input type="text" name="name" placeholder="Client Name" value={data.client.name || ""}
         onChange={handleClientChange} style={{ width: "100%", marginBottom: 6 }} />
@@ -94,9 +104,13 @@ export default function InvoiceForm({ data, onChange }) {
         ))}
       </select>
 
-      <h3>GST (%)</h3>
-      <input type="number" min="0" max="100" value={data.gstPercent}
-        onChange={handleGstChange} placeholder="GST %" style={{ width: 80, marginBottom: 10 }} />
+      {data.invoiceType === "Tax Invoice" && (
+        <>
+          <h3>GST (%)</h3>
+          <input type="number" min="0" max="100" value={data.gstPercent}
+            onChange={handleGstChange} placeholder="GST %" style={{ width: 80, marginBottom: 10 }} />
+        </>
+      )}
 
       <h3>Payment Made</h3>
       <input type="number" min="0" step="0.01" value={data.paymentMade}
